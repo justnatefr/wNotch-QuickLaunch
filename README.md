@@ -14,7 +14,7 @@ Options under the plugin in Notch's Settings, applied without a restart:
 | Also show pinned apps on the Plugins tab | off |
 | Show a notice in the pill when an app opens | on |
 
-Pinned apps are saved in `%AppData%\Notch\plugin-data\nate.quick-launch\apps.json`. Each entry also has an `Arguments` field you can fill in by hand (quit Notch first) if an app needs command-line arguments.
+Pinned apps are saved in `%AppData%\Notch\plugin-data\justnatefr.quick-launch\apps.json`. Each entry also has an `Arguments` field you can fill in by hand (quit Notch first) if an app needs command-line arguments.
 
 Plugin API version 5, so it works with any Notch that supports page actions and blocks.
 
@@ -51,10 +51,10 @@ For debugging, set `Notch.exe` as the project's start program with `--plugin=bin
 ## Install
 
 ```
-dotnet publish -c Release -o dist\nate.quick-launch
+dotnet publish -c Release -o dist\justnatefr.quick-launch
 ```
 
-Copy `dist\nate.quick-launch` into `%AppData%\Notch\plugins\` (Settings > Plugins > Open folder), open Settings, switch on **Quick launch**, approve it and save.
+Copy `dist\justnatefr.quick-launch` into `%AppData%\Notch\plugins\` (Settings > Plugins > Open folder), open Settings, switch on **Quick launch**, approve it and save.
 
 When you approve it, Notch will mention that the plugin starts programs. That is expected: it is how the buttons open your apps. Nothing else is run.
 

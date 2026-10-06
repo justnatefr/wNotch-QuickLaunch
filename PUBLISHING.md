@@ -55,7 +55,7 @@ To get an **Install** button on the website and show up under **Browse plugins**
 
 ```json
 {
-  "id": "nate.quick-launch",
+  "id": "justnatefr.quick-launch",
   "name": "Quick launch",
   "repository": "justnatefr/wNotch-QuickLaunch",
   "author": "Nate",
