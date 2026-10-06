@@ -2,13 +2,15 @@ using System.ComponentModel;
 using System.Diagnostics;
 using Notch.Core.Activities;
 using Notch.Core.Plugins;
+using Activity = Notch.Core.Activities.Activity;
 
 namespace QuickLaunch;
 
 /// <summary>
-/// A "Launch" tab in the expanded notch: a grid of buttons, one per pinned app. Apps are picked
-/// from the Start menu (or pasted as a path or URL) on the tab's Add view, and reordered,
-/// renamed or removed on its Edit view.
+/// A "Launch" tab in the expanded notch: a button for each pinned app, with the app's icon or a
+/// picture the user chose. Apps are picked from the Start menu (or browsed for, or pasted as a
+/// path or URL) on the tab's Add view, and reordered, renamed, given a picture or removed on its
+/// Edit view.
 /// </summary>
 public sealed class QuickLaunchPlugin : INotchPlugin
 {
@@ -16,6 +18,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
     private const string LaunchGlyph = "\uE8A7";
     private const string ErrorGlyph = "\uE783";
     private const int MaxChoices = 150;
+    private const double PictureHeight = 40;
 
     private enum View
     {
@@ -29,6 +32,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
 
     private IPluginHost _host = null!;
     private PinnedAppStore _store = null!;
+    private AppPictures _pictures = null!;
 
     // Everything below is guarded by _gate.
     private View _view = View.Apps;
@@ -37,6 +41,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
     private IReadOnlyList<CatalogApp> _catalog = [];
     private bool _scanning;
     private int _columns = 3;
+    private bool _showPictures = true;
     private bool _showCards;
     private bool _notifyOnLaunch = true;
     private bool _cardsShown;
@@ -46,6 +51,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
     {
         _host = host;
         _store = PinnedAppStore.Load(host.DataDirectory, host.Log);
+        _pictures = new AppPictures(host.DataDirectory, host.Log);
 
         ReadSettings(writeDefaults: true);
 
@@ -54,6 +60,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
 
         Render();
         ScanStartMenu();
+        FetchIcons();
     }
 
     public void Stop()
@@ -68,6 +75,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
     {
         IPluginSettings settings = _host.Settings;
         double columns = settings.Get("columns", 3.0);
+        string layout = settings.Get("layout", "Pictures");
         bool showCards = settings.Get("showCards", false);
         bool notify = settings.Get("notifyOnLaunch", true);
 
@@ -75,6 +83,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
         {
             // Written back so settings.json lists every option, as the plugin docs suggest.
             settings.Set("columns", columns);
+            settings.Set("layout", layout);
             settings.Set("showCards", showCards);
             settings.Set("notifyOnLaunch", notify);
         }
@@ -83,6 +92,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
         {
             _columns = double.IsFinite(columns) ? Math.Clamp((int)Math.Round(columns), 1, 6) : 3;
             _showCards = showCards;
+            _showPictures = !string.Equals(layout, "Compact", StringComparison.OrdinalIgnoreCase);
             _notifyOnLaunch = notify;
         }
     }
@@ -97,6 +107,73 @@ public sealed class QuickLaunchPlugin : INotchPlugin
         catch (Exception e)
         {
             _host.Log.Error("Could not apply changed settings.", e);
+        }
+    }
+
+    // ---- Pictures ---------------------------------------------------------------------------
+
+    /// <summary>Reads, in the background, the icons of pinned apps that have none yet.</summary>
+    private void FetchIcons() => _pictures.FetchMissing(_store.All, Render, _stopping.Token);
+
+    /// <summary>Asks for a picture file and uses it for the app.</summary>
+    private void ChoosePicture(string id)
+    {
+        string? file = WindowsShell.PickFile("Choose a picture for this app", WindowsShell.PictureFilter);
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string picture = _pictures.Import(id, file);
+            string? previous = _store.SetPicture(id, picture);
+            if (previous is not null)
+            {
+                DeletePictureFile(previous);
+            }
+        }
+        catch (InvalidDataException e)
+        {
+            _host.Shell.Notify("Can't use that picture", e.Message, ErrorGlyph, GlowColor.Amber, TimeSpan.FromSeconds(4));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _host.Log.Warn($"Could not copy the picture {file}: {e.Message}");
+            _host.Shell.Notify("Can't use that picture", e.Message, ErrorGlyph, GlowColor.Amber, TimeSpan.FromSeconds(4));
+        }
+
+        Render();
+    }
+
+    /// <summary>Goes back to the app's own icon.</summary>
+    private void ResetPicture(string id)
+    {
+        _store.SetPicture(id, null);
+        _pictures.Forget(id, keepIcon: true);
+        FetchIcons();
+        Render();
+    }
+
+    private void DeletePictureFile(string name)
+    {
+        try
+        {
+            File.Delete(Path.Combine(_host.DataDirectory, "icons", name));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _host.Log.Warn($"Could not delete the old picture {name}: {e.Message}");
+        }
+    }
+
+    /// <summary>The Add view's Browse button: pick any program, shortcut or file and pin it.</summary>
+    private void BrowseForApp()
+    {
+        string? file = WindowsShell.PickFile("Choose an app to pin", WindowsShell.AppFilter);
+        if (file is not null)
+        {
+            OnAddInput(file);
         }
     }
 
@@ -195,7 +272,18 @@ public sealed class QuickLaunchPlugin : INotchPlugin
 
             if (notify)
             {
-                _host.Shell.Notify(app.Name, "Opening", LaunchGlyph, GlowColor.Cyan, TimeSpan.FromSeconds(1.5));
+                // An activity rather than Shell.Notify, so the notice can carry the app's picture.
+                _host.Activities.Publish(new Activity
+                {
+                    Id = "launched",
+                    Tier = ActivityTier.Transient,
+                    Title = app.Name,
+                    Detail = "Opening",
+                    Glyph = LaunchGlyph,
+                    Image = _pictures.For(app),
+                    Glow = new Glow(GlowColor.Cyan, GlowPattern.Flash),
+                    Lifetime = TimeSpan.FromSeconds(1.5),
+                });
             }
         }
         catch (Exception e) when (e is Win32Exception or InvalidOperationException or FileNotFoundException)
@@ -207,11 +295,19 @@ public sealed class QuickLaunchPlugin : INotchPlugin
 
     private void TogglePin(CatalogApp app)
     {
-        if (!_store.RemoveTarget(app.Target) && !_store.Add(app.Name, app.Target))
+        PinnedApp? pinned = _store.All.FirstOrDefault(a => string.Equals(a.Target, app.Target, StringComparison.OrdinalIgnoreCase));
+        if (pinned is not null)
+        {
+            Remove(pinned.Id);
+            return;
+        }
+
+        if (!_store.Add(app.Name, app.Target))
         {
             _host.Shell.Notify("Quick launch is full", $"Remove an app to pin more (up to {PinnedAppStore.MaxApps}).", ErrorGlyph, GlowColor.Amber);
         }
 
+        FetchIcons();
         Render();
     }
 
@@ -229,6 +325,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
             else if (_store.Add(target.Name, target.Target))
             {
                 _host.Shell.Notify($"Pinned {target.Name}", glyph: LaunchGlyph, color: GlowColor.Green);
+                FetchIcons();
             }
             else
             {
@@ -336,6 +433,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
     private void Remove(string id)
     {
         _store.Remove(id);
+        _pictures.Forget(id);
         lock (_gate)
         {
             if (_renamingId == id)
@@ -392,6 +490,22 @@ public sealed class QuickLaunchPlugin : INotchPlugin
             });
             blocks.Add(new PluginButtons { Actions = [new PluginAction { Label = "Add apps", Clicked = () => Show(View.Add) }] });
         }
+        else if (_showPictures)
+        {
+            // The page's buttons hold text only, so each app is its picture with its button below.
+            foreach (PinnedApp app in apps)
+            {
+                if (_pictures.For(app) is { } picture)
+                {
+                    blocks.Add(new PluginImage { Data = picture, Height = PictureHeight });
+                }
+
+                blocks.Add(new PluginButtons
+                {
+                    Actions = [new PluginAction { Label = app.Name, Hint = app.Target, Clicked = () => Launch(app) }],
+                });
+            }
+        }
         else
         {
             foreach (PinnedApp[] row in apps.Chunk(_columns))
@@ -415,7 +529,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
             Actions =
             [
                 new PluginAction { Label = "Add", Hint = "Pin apps to this tab", Clicked = () => Show(View.Add) },
-                new PluginAction { Label = "Edit", Hint = "Reorder, rename or remove apps", Enabled = apps.Count > 0, Clicked = () => Show(View.Edit) },
+                new PluginAction { Label = "Edit", Hint = "Reorder, rename, change the picture or remove apps", Enabled = apps.Count > 0, Clicked = () => Show(View.Edit) },
             ],
             Blocks = blocks,
         };
@@ -455,6 +569,10 @@ public sealed class QuickLaunchPlugin : INotchPlugin
                     _renamingId == id
                         ? new PluginAction { Label = "Cancel", Clicked = () => StartRename(null) }
                         : new PluginAction { Label = "Rename", Clicked = () => StartRename(id) },
+                    new PluginAction { Label = "Picture", Hint = "Choose a picture for this app", Clicked = () => ChoosePicture(id) },
+                    .. app.Picture is null
+                        ? Array.Empty<PluginAction>()
+                        : [new PluginAction { Label = "Use app icon", Hint = "Go back to the app's own icon", Clicked = () => ResetPicture(id) }],
                     new PluginAction { Label = "Remove", Color = GlowColor.Red, Confirm = true, Clicked = () => Remove(id) },
                 ],
             });
@@ -519,6 +637,7 @@ public sealed class QuickLaunchPlugin : INotchPlugin
                     Enabled = _filter.Length > 0,
                     Clicked = () => OnAddInput(""),
                 },
+                new PluginAction { Label = "Browse", Hint = "Pick a program, shortcut or file", Clicked = BrowseForApp },
                 new PluginAction { Label = "Refresh", Hint = "Read the Start menu again", Enabled = !_scanning, Clicked = ScanStartMenu },
             ],
             Choices = choices,

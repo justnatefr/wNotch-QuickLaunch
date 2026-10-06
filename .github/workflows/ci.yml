@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Builds the plugin the same way the release does, against the oldest Notch it supports.
+      - uses: actions/checkout@v4
+        with:
+          repository: Brick-Bread/WNotch
+          ref: v0.7.0
+          path: notch
+      - run: dotnet build notch/src/Notch.Core -c Release -o notch-core
+      - run: dotnet build QuickLaunch.csproj -c Release -p:NotchCorePath=${{ github.workspace }}\notch-core\Notch.Core.dll -p:TreatWarningsAsErrors=true
+        shell: pwsh
+
+      # Reads real icons through the Windows shell and checks the PNGs the plugin makes from them.
+      - run: dotnet run --project tests/WindowsShellTests -c Release
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: icons
+          path: tests/WindowsShellTests/bin/Release/net10.0/icon-*.png
+          if-no-files-found: ignore

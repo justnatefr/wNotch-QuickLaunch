@@ -7,8 +7,8 @@
     <RootNamespace>QuickLaunch</RootNamespace>
     <!-- Makes the build output a complete plugin folder (a .deps.json next to the dll). -->
     <EnableDynamicLoading>true</EnableDynamicLoading>
-    <!-- The release workflow checks Notch out next to this project; keep its sources out of the build. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);notch/**;notch-core/**;dist/**</DefaultItemExcludes>
+    <!-- Keep the Windows tests, and the Notch copy the release workflow checks out here, out of the plugin. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);notch/**;notch-core/**;dist/**;tests/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Notch.Core.dll ships next to Notch.exe. Override with -p:NotchCorePath=... to build against

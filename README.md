@@ -1,18 +1,22 @@
 # Quick launch for Notch
 
-Adds a **Launch** tab to the expanded notch with a button for each app you pin. Click a button to open the app.
+Adds a **Launch** tab to the expanded notch with a button for each app you pin, under the app's icon. Click a button to open the app.
 
 - **Add** lists every app in your Start menu (yours and all users'). Click one to pin it, click again to unpin. Type in the line at the bottom and press Enter to search. You can also paste a full path (program, shortcut, folder or document), a link (`https://…`, `steam://…`, `ms-settings:…`) or a program name on your PATH (`wt`, `code`) and press Enter to pin it directly.
-- **Edit** lets you move apps up or down, rename them or remove them. Remove asks for a second click.
+- **Add > Browse** opens the Windows file picker to pin any program, shortcut or file.
+- **Edit** lets you move apps up or down, rename them, give them a different picture (**Picture** opens the file picker; PNG, JPEG, BMP, GIF or ICO up to 4 MB) or remove them. **Use app icon** goes back to the app's own icon. Remove asks for a second click.
 - Up to 40 apps.
 
 Options under the plugin in Notch's Settings, applied without a restart:
 
 | Option | Default |
 |---|---|
-| Buttons per row (1 to 6) | 3 |
+| Layout: **Pictures** (each app's icon above its button) or **Compact** (several text buttons per row) | Pictures |
+| Buttons per row, in the Compact layout (1 to 6) | 3 |
 | Also show pinned apps on the Plugins tab | off |
 | Show a notice in the pill when an app opens | on |
+
+Notch's page buttons can only hold text, so in the Pictures layout each app's picture sits above its button rather than on it.
 
 Pinned apps are saved in `%AppData%\Notch\plugin-data\justnatefr.quick-launch\apps.json`. Each entry also has an `Arguments` field you can fill in by hand (quit Notch first) if an app needs command-line arguments.
 
@@ -65,4 +69,8 @@ When you approve it, Notch will mention that the plugin starts programs. That is
 | `QuickLaunchPlugin.cs` | The plugin: the Launch tab's three views (apps, edit, add), launching, settings, cards. |
 | `PinnedApps.cs` | The pinned-app list and saving it to `apps.json`. |
 | `AppCatalog.cs` | Reads the Start menu shortcuts shown in the Add view. |
+| `AppPictures.cs` | Each app's picture: the one chosen, or its icon, kept in the data folder's `icons` folder. |
+| `WindowsShell.cs` | Reads an app's icon from Windows as a PNG, and shows the file picker. |
+| `Png.cs` | Writes those icons as PNG files. |
+| `tests/WindowsShellTests` | Reads real icons on Windows and checks the PNGs; run by `.github/workflows/ci.yml`. |
 | `plugin.json` | The manifest, including the options shown in Settings. |

@@ -15,6 +15,9 @@ public sealed record PinnedApp
 
     /// <summary>Optional command-line arguments. Not set from the UI; edit apps.json to add them.</summary>
     public string? Arguments { get; init; }
+
+    /// <summary>A picture the user chose, as a file name in the data folder's icons\; null for the app's own icon.</summary>
+    public string? Picture { get; init; }
 }
 
 /// <summary>
@@ -145,6 +148,24 @@ public sealed class PinnedAppStore
                 _apps[i] = _apps[i] with { Name = name.Trim() };
                 Save();
             }
+        }
+    }
+
+    /// <summary>Sets or clears (null) the picture the user chose. Returns the previous one.</summary>
+    public string? SetPicture(string id, string? picture)
+    {
+        lock (_gate)
+        {
+            int i = _apps.FindIndex(a => a.Id == id);
+            if (i < 0)
+            {
+                return null;
+            }
+
+            string? previous = _apps[i].Picture;
+            _apps[i] = _apps[i] with { Picture = picture };
+            Save();
+            return previous;
         }
     }
 
