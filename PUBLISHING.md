@@ -47,7 +47,7 @@ In Notch, open **Settings > Plugins**, type `justnatefr/wNotch-QuickLaunch` into
 
 ## Later releases
 
-Raise `"version"` in `plugin.json` (for example to `1.0.1`), commit and push, then tag and push the same version (`v1.0.1`). Keep the `id` the same forever, since it names the plugin's data folder. People see **Update and restart** in Settings.
+Raise `"version"` in `plugin.json` (for example to `1.0.1`), commit and push, then tag and push the same version (`v1.0.1`). Or, instead of pushing a tag, open **Actions > release > Run workflow** on GitHub and type `v1.0.1`; the workflow creates the tag and the release. Keep the `id` the same forever, since it names the plugin's data folder. People see **Update and restart** in Settings.
 
 ## Optional: the plugin list on the Notch website
 
