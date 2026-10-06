@@ -3,6 +3,12 @@ name: release
 on:
   push:
     tags: ['v*']
+  # Also runnable from the Actions tab: type the version tag (e.g. v1.0.1) and the release creates it.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. v1.0.0'
+        required: true
 
 permissions:
   contents: write
@@ -10,6 +16,7 @@ permissions:
 env:
   PROJECT: QuickLaunch.csproj
   ZIP_NAME: quick-launch.zip
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -40,4 +47,4 @@ jobs:
         run: |
           Remove-Item dist\*.pdb -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath $env:ZIP_NAME
-          gh release create $env:GITHUB_REF_NAME $env:ZIP_NAME --title $env:GITHUB_REF_NAME --generate-notes
+          gh release create $env:TAG $env:ZIP_NAME --title $env:TAG --target $env:GITHUB_SHA --generate-notes
