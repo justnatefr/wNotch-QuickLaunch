@@ -1,0 +1,16 @@
+{
+  "id": "nate.quick-launch",
+  "name": "Quick launch",
+  "version": "1.0.0",
+  "author": "Nate",
+  "repository": "justnatefr/wNotch-QuickLaunch",
+  "description": "A Launch tab with the apps you pin. Pick them from the Start menu or paste a path or link, then open them with one click.",
+  "assembly": "QuickLaunch.dll",
+  "apiVersion": 5,
+  "permissions": ["shell", "filesystem"],
+  "settings": [
+    { "key": "columns", "label": "Buttons per row", "type": "number", "min": 1, "max": 6, "step": 1 },
+    { "key": "showCards", "label": "Also show pinned apps on the Plugins tab", "type": "bool" },
+    { "key": "notifyOnLaunch", "label": "Show a notice in the pill when an app opens", "type": "bool" }
+  ]
+}

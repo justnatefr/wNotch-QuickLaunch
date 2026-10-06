@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>QuickLaunch</RootNamespace>
+    <!-- Makes the build output a complete plugin folder (a .deps.json next to the dll). -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- The release workflow checks Notch out next to this project; keep its sources out of the build. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);notch/**;notch-core/**;dist/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!-- Notch.Core.dll ships next to Notch.exe. Override with -p:NotchCorePath=... to build against
+       a different copy, e.g. one built from a WNotch clone. -->
+  <PropertyGroup>
+    <NotchCorePath Condition="'$(NotchCorePath)' == ''">$(LocalAppData)\Programs\Notch\Notch.Core.dll</NotchCorePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Notch supplies Notch.Core at run time, so it must not be copied into the plugin folder. -->
+    <Reference Include="Notch.Core">
+      <HintPath>$(NotchCorePath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
